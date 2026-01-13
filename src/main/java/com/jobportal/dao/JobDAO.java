@@ -199,4 +199,98 @@ public class JobDAO {
         }
         return appliedJobs;
     }
+
+    public List<JobDTO> searchJobs(
+            String keyword,
+            String location,
+            Integer minExperience,
+            Integer minSalary,
+            Integer maxSalary
+    ) {
+
+        List<JobDTO> jobs = new ArrayList<>();
+
+        StringBuilder sql = new StringBuilder(
+                "SELECT * FROM jobs WHERE status = 'OPEN' "
+        );
+
+        // 🔹 Case-insensitive keyword search
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            sql.append(
+                    "AND (LOWER(job_title) LIKE ? " +
+                            "OR LOWER(job_description) LIKE ? " +
+                            "OR LOWER(skills_required) LIKE ?) "
+            );
+        }
+
+        // 🔹 Case-insensitive location filter
+        if (location != null && !location.trim().isEmpty()) {
+            sql.append("AND LOWER(location) LIKE ? ");
+        }
+
+        if (minExperience != null) {
+            sql.append("AND experience_required >= ? ");
+        }
+
+        if (minSalary != null) {
+            sql.append("AND salary_max >= ? ");
+        }
+
+        if (maxSalary != null) {
+            sql.append("AND salary_max <= ? ");
+        }
+
+        sql.append("ORDER BY posted_date DESC");
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql.toString())) {
+
+            int index = 1;
+
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                String kw = "%" + keyword.toLowerCase() + "%";
+                ps.setString(index++, kw);
+                ps.setString(index++, kw);
+                ps.setString(index++, kw);
+            }
+
+            if (location != null && !location.trim().isEmpty()) {
+                ps.setString(index++, "%" + location.toLowerCase() + "%");
+            }
+
+            if (minExperience != null) {
+                ps.setInt(index++, minExperience);
+            }
+
+            if (minSalary != null) {
+                ps.setInt(index++, minSalary);
+            }
+
+            if (maxSalary != null) {
+                ps.setInt(index++, maxSalary);
+            }
+
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                JobDTO job = new JobDTO();
+                job.setJobId(rs.getInt("job_id"));
+                job.setJobTitle(rs.getString("job_title"));
+                job.setJobDescription(rs.getString("job_description"));
+                job.setSkillsRequired(rs.getString("skills_required"));
+                job.setExperienceRequired(rs.getInt("experience_required"));
+                job.setLocation(rs.getString("location"));
+                job.setSalaryMin(rs.getInt("salary_min"));
+                job.setSalaryMax(rs.getInt("salary_max"));
+                job.setStatus(rs.getString("status"));
+                jobs.add(job);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return jobs;
+    }
+
 }
